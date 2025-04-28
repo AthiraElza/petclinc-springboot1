@@ -8,11 +8,11 @@ pipeline {
     environment {
         IMAGE_NAME        = "springbootapp"
         IMAGE_TAG         = "${BUILD_NUMBER}" // Use build number as version
-        ACR_NAME          = "jenkinsazure"
+        ACR_NAME          = "jenkinsazurejp"
         ACR_LOGIN_SERVER  = "${ACR_NAME}.azurecr.io"
         FULL_IMAGE_NAME   = "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
-        TENANT_ID         = "ec78375d-0db0-42cf-82a6-2e6403e95936"
-        RESOURCE_GROUP    = "Jenkins"
+        TENANT_ID         = "38fb3b20-a781-4c88-9110-8c817f19c4e1"
+        RESOURCE_GROUP    = "JP"
         AKS_CLUSTER       = "springboot"
         K8S_NAMESPACE     = "default"
         K8S_DEPLOYMENT    = "springboot-app"
@@ -21,7 +21,7 @@ pipeline {
     stages {
         stage('Checkout From Git') {
             steps {
-                git branch: 'prod', url: 'https://github.com/bkrrajmali/enahanced-petclinc-springboot.git'
+                git branch: 'prod', url: 'https://github.com/AthiraElza/petclinc-springboot1.git'
             }
         }
 
@@ -54,20 +54,12 @@ pipeline {
                 withSonarQubeEnv('sonarserver') {
                     sh '''
                         $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.organization=bkrrajmali \
-                        -Dsonar.projectName=SpringBootPet \
-                        -Dsonar.projectKey=bkrrajmali_springbootpet \
+                        -Dsonar.organization=athiraelza \
+                        -Dsonar.projectName=petclinc-springboot1 \
+                        -Dsonar.projectKey=AthiraElza_petclinc-springboot1 \
                         -Dsonar.java.binaries=. \
                         -Dsonar.exclusions=**/trivy-fs-output.txt
                     '''
-                }
-            }
-        }
-
-        stage('Sonar Quality Gate') {
-            steps {
-                timeout(time: 1, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true, credentialsId: 'sonar'
                 }
             }
         }
@@ -123,36 +115,6 @@ pipeline {
                             az login --service-principal -u $AZURE_USERNAME -p $AZURE_PASSWORD --tenant $TENANT_ID
                             az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER --overwrite-existing    
                         '''
-                    }
-                }
-            }
-        }
-
-        stage('Kubernetes Deployment') {
-            steps {
-                script {
-                    echo "Kubernetes Deployment Stage Started"
-
-                    def output = sh(
-                        script: "kubectl get deployment ${K8S_DEPLOYMENT} -n $K8S_NAMESPACE --ignore-not-found",
-                        returnStdout: true
-                    ).trim()
-
-                    def deploymentExists = output != ""
-
-                    if (deploymentExists) {
-                        echo "Deployment exists. Performing rolling update with new image: ${BUILD_NUMBER}"
-                        sh """
-                            kubectl set image deployment/${K8S_DEPLOYMENT} \
-                            ${K8S_DEPLOYMENT}=${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${BUILD_NUMBER} \
-                            -n $K8S_NAMESPACE
-                        """
-                    } else {
-                        echo "Deployment not found. Creating new deployment from template"
-                        sh """
-                            sed "s/__IMAGE_TAG__/${BUILD_NUMBER}/" k8s/sprinboot-deployment.yaml > k8s/tmp-deployment.yaml
-                            kubectl apply -f k8s/tmp-deployment.yaml -n $K8S_NAMESPACE
-                        """
                     }
                 }
             }
