@@ -113,7 +113,6 @@ pipeline {
                         echo "Azure Login to Kubernetes Started"
                         sh '''
                             az login --service-principal -u $AZURE_USERNAME -p $AZURE_PASSWORD --tenant $TENANT_ID
-                            az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER --overwrite-existing    
                         '''
                     }
                 }
