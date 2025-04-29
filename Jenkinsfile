@@ -113,7 +113,37 @@ pipeline {
                         echo "Azure Login to Kubernetes Started"
                         sh '''
                             az login --service-principal -u $AZURE_USERNAME -p $AZURE_PASSWORD --tenant $TENANT_ID
+                            az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER --overwrite-existing    
                         '''
+                    }
+                }
+            }
+        }
+        stage('Kubernetes Deployment') {
+            steps {
+                script {
+                    echo "Kubernetes Deployment Stage Started"
+
+                    def output = sh(
+                        script: "kubectl get deployment ${K8S_DEPLOYMENT} -n $K8S_NAMESPACE --ignore-not-found",
+                        returnStdout: true
+                    ).trim()
+
+                    def deploymentExists = output != ""
+
+                    if (deploymentExists) {
+                        echo "Deployment exists. Performing rolling update with new image: ${BUILD_NUMBER}"
+                        sh """
+                            kubectl set image deployment/${K8S_DEPLOYMENT} \
+                            ${K8S_DEPLOYMENT}=${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${BUILD_NUMBER} \
+                            -n $K8S_NAMESPACE
+                        """
+                    } else {
+                        echo "Deployment not found. Creating new deployment from template"
+                        sh """
+                            sed "s/__IMAGE_TAG__/${BUILD_NUMBER}/" k8s/sprinboot-deployment.yaml > k8s/tmp-deployment.yaml
+                            kubectl apply -f k8s/tmp-deployment.yaml -n $K8S_NAMESPACE
+                        """
                     }
                 }
             }
